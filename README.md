@@ -18,6 +18,8 @@ cd req92534 && ./1_build.sh
 ./2_run.sh
 ```
 
+>If you get an error `Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?` on `2_run.sh`, just give it a second for waiting for the `vdocker` container up.
+
 Use `1_build.bat` and `2_run.bat` instead if you are under Windows.
 
 ### Using
