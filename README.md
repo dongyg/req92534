@@ -6,7 +6,7 @@
 
 ### Run
 
-Please prepare a Linux with `docker` and `docker-compose` environment.
+Please prepare a Linux (or Windows) with `docker` and `docker-compose` environment.
 
 Running this web application will create a virtual docker environment as a docker container on your host docker.
 
@@ -18,6 +18,8 @@ cd req92534 && ./1_build.sh
 ./2_run.sh
 ```
 
+Use `1_build.bat` and `2_run.bat` instead if you are under Windows.
+
 ### Using
 
 After the docker containers are up, please open a browser and access `http://localhost:8027`. The web page should be like this
@@ -26,6 +28,6 @@ After the docker containers are up, please open a browser and access `http://loc
 
 ### Clean
 
-After all done, just run `3_clear.sh` to clean up your host environment. Plus remove the folder `req92534`
+After all done, just run `3_clear.sh` to clean up your host environment. Use `3_clear.bat` instead under Windows. Plus remove the folder `req92534`.
 
 ### Thank you!

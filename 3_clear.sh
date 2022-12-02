@@ -4,4 +4,4 @@
 # Run this file to clear the whole virtual docker environment
 
 # Create a virtual docker environment
-cd vdocker && docker-compose down
+docker-compose -f vdocker/docker-compose.yaml down
