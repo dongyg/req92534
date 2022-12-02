@@ -1,0 +1,16 @@
+# redis:
+#   host: 192.168.32.2
+#   port: 6379
+#   db: 0
+#   decode_responses: yes
+
+# mysql:
+#   # driver: pymysql # MySQLdb, pymysql
+#   dbn: mysql
+#   db: test
+#   host: 192.168.32.2
+#   port: 3306
+#   user: root
+#   passwd: '1712BCE8'
+
+mongo: mongodb://root:3Umx98K1FR6gCEPpNWeLcu@192.168.32.2:27017/

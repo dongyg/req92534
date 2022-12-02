@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Assignment Phase Req#92534 ISL 27R – Full Stack Developer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="author" content="Yiguang Dong">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.2.25/dist/index.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.67.0/dist/L.Control.Locate.min.css">
+    <style type="text/css">
+    [v-cloak] {
+        display: none !important;
+    }
+    body {
+        padding: 0;
+        margin: 0;
+    }
+    html,
+    body,
+    #mapContainer {
+        width: 100%;
+        height: 860px;
+        cursor: default;
+    }
+    #mapContainer.leaflet-fullscreen {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    #mapContainer .leaflet-popup-content-wrapper {
+      max-height: 380px; overflow: scroll;
+    }
+    .leaflet-control-fullscreen {
+      background-image: url(icon-fullscreen.png);
+    }
+    #mapContainer .leaflet-popup-content {width: 320px;}
+    .gly-spin {animation: spin 1s infinite linear;}
+    .dialog-footer button:first-child {
+        margin-right: 10px;
+    }
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-box {
+        width: 100%;
+        margin-bottom: 11px;
+    }
+    .card-desc {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+    }
+    </style>
+</head>
+
+<body v-cloak id="vueContainer">
+    <el-row :gutter="10">
+        <el-col :span="8" style="padding-left: 15px;">
+            <el-row :gutter="0">
+                <el-col :span="24" style="margin-top: 10px;margin-bottom: 10px;display: flex;justify-content:space-between;">
+                    <el-button type="primary" @click.stop="tapShowFilter">Filter</el-button>
+                    <el-pagination layout="prev, pager, next" :total="gotEvents.length" :page-size="pageSize" @current-change="onPageChanged" />
+                </el-col>
+            </el-row>
+            <el-card class="card-box" v-for="(item, idx) in showEvents" :key="item.id" shadow="hover" :data-idx="idx" @click="tapCard">
+                <template #header>
+                    <div class="card-header">
+                        <div style="display: flex;justify-content:start;">
+                            <span>{{item.headline}}</span>&nbsp;
+                        </div>
+                        <div style="display: flex;justify-content:end;">
+                            <span v-if="item.status=='ACTIVE'"><el-icon color="#67C23A"><Check /></el-icon></span>
+                            <span v-if="item.status=='ARCHIVED'"><el-icon color="#909399"><Close /></el-icon></span>
+                            &nbsp;
+                            <span>{{item.event_type}}</span>
+                        </div>
+                    </div>
+                </template>
+                <div class="card-desc">{{item.description}}</div>
+            </el-card>
+        </el-col>
+        <el-col :span="16" style="padding-right: 10px;padding-top:10px;">
+            <div id="mapContainer"></div>
+        </el-col>
+    </el-row>
+    <el-dialog v-model="dialogFilterVisible" title="Filter" width="30%" align-center>
+        <el-form ref="form" :model="form27" label-width="80px" style="margin: 10px;">
+            <el-form-item label="Area">
+                <el-select v-model="form27.area_id" default-first-option placeholder="Area" >
+                    <el-option v-for="item in areaOptions" :key="item.id" :label="item.name" :value="item.id"/>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="Severity">
+                <el-checkbox-group v-model="form27.severity">
+                    <el-checkbox v-for="item in severityOptions" :label="item" />
+                </el-checkbox-group>
+            </el-form-item>
+            <el-form-item label="Event Type">
+                <el-select v-model="form27.event_type" multiple filterable default-first-option :reserve-keyword="false" placeholder="Event Type" style="width:100%;">
+                    <el-option v-for="item in eventTypeOptions" :key="item.value" :label="item.label" :value="item.value"/>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="Start Date">
+                <el-date-picker v-model="form27.created" type="datetime" placeholder="Select date and time" :shortcuts="datetimeShortcuts" />
+            </el-form-item>
+            <el-form-item label="">
+            </el-form-item>
+            <el-alert v-show="message" :title="message" :description="description" :type="msgtype" show-icon />
+        </el-form>
+        <template #footer>
+            <span class="dialog-footer">
+                <el-button @click.stop="tapReset">Reset</el-button>
+                <el-button @click.stop="dialogFilterVisible = false">Cancel</el-button>
+                <el-button type="primary" @click.stop="tapConfirmFilter">Confirm</el-button>
+            </span>
+        </template>
+    </el-dialog>
+    <div ref="divTip" id="divTip" style="display: none;"></div>
+</body>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@1.12.4/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet-src.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.67.0/dist/L.Control.Locate.min.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.2.37/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/element-plus@2.2.25/dist/index.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.0.10/dist/index.iife.min.js"></script>
+<script src="leaflet.ChineseTmsProviders.min.js"></script>
+<script src="leaflet.zoomfs.min.js"></script>
+
+<script type="text/javascript">
+// Vue App
+const dataForVue = {
+    data() {
+        return {
+            msgtype: 'info', // success, info, warning, error
+            message: '',
+            description: null,
+            dialogFilterVisible: false,
+            form27: {
+                area_id: '',
+                severity: [],
+                event_type: [],
+                created: ''
+            },
+            areaOptions: [],
+            severityOptions: ['MINOR','MODERATE','MAJOR','UNKNOWN'],
+            eventTypeOptions: [
+                {value:'CONSTRUCTION', label:'CONSTRUCTION - planned road work'},
+                {value:'SPECIAL_EVENT', label:'SPECIAL_EVENT - special events (fair, sport event, etc.)'},
+                {value:'INCIDENT', label:'INCIDENT - accidents and other unexpected events'},
+                {value:'WEATHER_CONDITION', label:'WEATHER_CONDITION - Weather condition affecting the road'},
+                {value:'ROAD_CONDITION', label:'ROAD_CONDITION - Status of the road that might affect travelers.'},
+            ],
+            datetimeShortcuts: [{
+                text: 'Today',
+                value: new Date(),
+            },{
+                text: 'Tomorrow',
+                value: () => {
+                    const date = new Date()
+                    date.setTime(date.getTime() + 3600 * 1000 * 24)
+                    return date
+                },
+            }],
+            pageSize: 5,
+            pageCurr: 1,
+            eventsIds: [],
+            gotEvents: [],
+            showEvents: [],
+        }
+    },
+    computed: {
+    },
+    methods: {
+        tapShowFilter(event){
+            this.dialogFilterVisible = true;
+        },
+        createMarker(obj){
+            let self = this;
+            if(obj.geography){
+                if(obj.geography.type=='Point'){
+                    let latlng = [obj.geography.coordinates[1], obj.geography.coordinates[0]];
+                    obj.marker = L.marker(latlng, {index: self.gotEvents.length}).addTo(vsmap);
+                    obj.marker.bindTooltip(getTooltip, [12.5, 20.5]);
+                }else if(obj.geography.type=='LineString'){
+                    let latlngs = obj.geography.coordinates.map(x => [x[1],x[0]]);
+                    obj.polyline = L.polyline(latlngs, {color: 'red', index: self.gotEvents.length}).addTo(vsmap);
+                    obj.polyline.bindTooltip(getTooltip, [12.5, 20.5])
+                }else if(obj.geography.type=='Polygon'){
+                    let latlngs = obj.geography.coordinates.map(x => [x[1],x[0]]);
+                    obj.polygon = L.polygon(latlngs, {color: 'red', index: self.gotEvents.length}).addTo(vsmap);
+                    obj.polygon.bindTooltip(getTooltip, [12.5, 20.5])
+                }
+            }
+        },
+        handleRespEvents(params, resp, clear){
+            let self = this;
+            if(clear){
+                // Remove all data
+                self.eventsIds = [];
+                self.gotEvents.map(function(obj, idx){
+                    // Remove markers, polylines, polylines
+                    if(obj.marker){
+                        obj.marker.remove();
+                    }else if(obj.polyline){
+                        obj.polyline.remove();
+                    }else if(obj.polygon){
+                        obj.polygon.remove();
+                    }
+                });
+                self.gotEvents = [];
+            }
+            var newEvents = [];
+            resp.events.map(function(obj, idx){
+                if(self.eventsIds.indexOf(obj.id)<0) {
+                    self.eventsIds.push(obj.id);
+                    newEvents.push(JSON.parse(JSON.stringify(obj)));
+                    // Draw markers, polylines, polylines on map
+                    self.createMarker(obj);
+                    // Append to gotEvents
+                    self.gotEvents.push(obj);
+                }
+            })
+            if(clear){
+                self.showEvents = [];
+                if(self.gotEvents.length>0 && params.area_id) {
+                    let obj = self.gotEvents[0];
+                    if(obj.marker){
+                        vsmap.flyTo(obj.marker._latlng, 8);
+                    }else if(obj.polyline){
+                        vsmap.flyToBounds(obj.polyline.getBounds());
+                    }else if(obj.polygon){
+                        vsmap.flyToBounds(obj.polygon.getBounds());
+                    }
+                }
+            }
+            // Append to showEvents if it is empty
+            if(self.showEvents.length==0){
+                self.showEvents = self.showEvents.concat(self.gotEvents.slice(0,this.pageSize));
+            }
+            return newEvents;
+        },
+        saveNewEvents(newEvents){
+            if(newEvents.length>0){
+                v1 = newEvents;
+                jQuery.post({
+                    url: '/api/event',
+                    data: {events: JSON.stringify(newEvents)},
+                    success:function(resp){
+                        console.log(resp);
+                    }, error: function (xhr,status,error,errmsg) {
+                    }
+                });
+            }
+        },
+        queryEvents(clear){
+            let self = this;
+            // Append filter parameters
+            var params = {};
+            if(self.form27.area_id) params.area_id = self.form27.area_id;
+            if(self.form27.created) params.created = '>'+new Date(self.form27.created).toISOString();
+            if(self.form27.severity&&self.form27.severity.length>0) params.severity = self.form27.severity.join(',');
+            if(self.form27.event_type&&self.form27.event_type.length>0) params.event_type = self.form27.event_type.join(',');
+            // Append bbox to parameters if no area given
+            if(!params.area_id) {
+                let mapBounds = vsmap.getBounds();
+                let showArea = L.latLngBounds(L.latLng(mapBounds.getSouth(), mapBounds.getWest()), L.latLng(mapBounds.getNorth(), mapBounds.getEast()));
+                params.bbox = showArea.toBBoxString();
+            }
+            // console.log('get', 'https://api.open511.gov.bc.ca/events', params);
+            jQuery.get({
+                url: 'https://api.open511.gov.bc.ca/events',
+                data: params,
+                success:function(resp){
+                    if(resp&&resp.events){
+                        var newEvents = self.handleRespEvents(params, resp, clear);
+                        self.saveNewEvents(newEvents);
+                    }
+                }
+            });
+        },
+        tapConfirmFilter(event){
+            let self = this;
+            self.dialogFilterVisible = false;
+            self.queryEvents(true);
+        },
+        tapReset(event){
+            this.form27 = {
+                area_id: '',
+                severity: [],
+                event_type: [],
+                created: ''
+            };
+        },
+        onPageChanged(val){
+            let self = this;
+            self.pageCurr = val;
+            let start = (self.pageCurr-1)*self.pageSize;
+            let end = start+self.pageSize;
+            self.showEvents = self.gotEvents.slice(start, end);
+        },
+        tapCard(event){
+            let self = this;
+            let idx = jQuery(event.target).parents('.card-box').data('idx');
+            if(idx>=0&&idx<self.showEvents.length) {
+                let obj = self.showEvents[idx];
+                if(self.lastTipObj && typeof self.lastTipObj.closeTooltip=='function'){
+                    self.lastTipObj.closeTooltip();
+                }
+                if(obj.marker){
+                    vsmap.options.needQuery = false;
+                    vsmap.flyTo(obj.marker._latlng, 15);
+                    obj.marker.openTooltip();
+                    self.lastTipObj = obj.marker;
+                }else if(obj.polyline){
+                    vsmap.options.needQuery = false;
+                    vsmap.flyToBounds(obj.polyline.getBounds());
+                    obj.polyline.openTooltip();
+                    self.lastTipObj = obj.polyline;
+                }else if(obj.polygon){
+                    vsmap.options.needQuery = false;
+                    vsmap.flyToBounds(obj.polygon.getBounds());
+                    obj.polygon.openTooltip();
+                    self.lastTipObj = obj.polygon;
+                }
+            }
+        },
+    },
+    mounted() {
+    },
+    created() {
+    },
+}
+const app = Vue.createApp(dataForVue);
+for ([name, comp] of Object.entries(ElementPlusIconsVue)) {
+    app.component(name, comp);
+}
+const vm = app.use(ElementPlus).mount('#vueContainer');
+
+jQuery(function(){
+    jQuery.get({
+        url: 'https://api.open511.gov.bc.ca/areas',
+        success: function(resp){
+            if(resp&&resp.areas){
+                vm.areaOptions = resp.areas;
+            }
+        }
+    });
+});
+
+// Vue Component for tip card
+const TipCardComponent = {
+    template: `<el-card shadow="always" style="min-width: 300px;max-width: 500px;">
+                <template #header>
+                    <div class="card-header">
+                        <div style="display: flex;justify-content:start;">
+                            <span>{{tipShowEvent.headline}}</span>&nbsp;
+                        </div>
+                        <div style="display: flex;justify-content:end;">
+                            <span v-if="tipShowEvent.status=='ACTIVE'"><el-icon color="#67C23A"><Check /></el-icon></span>
+                            <span v-if="tipShowEvent.status=='ARCHIVED'"><el-icon color="#909399"><Close /></el-icon></span>
+                            &nbsp;
+                            <span>{{tipShowEvent.event_type}}</span>
+                        </div>
+                    </div>
+                </template>
+                <div style="white-space: normal;">Headline: {{tipShowEvent.headline}}</div>
+                <div style="white-space: normal;">Created: {{tipShowEvent.created}}</div>
+                <div style="white-space: normal;">Updated: {{tipShowEvent.updated}}</div>
+                <div style="white-space: normal;">Schedule: {{tipShowEvent.schedule&&tipShowEvent.schedule.intervals?tipShowEvent.schedule.intervals.join(', '):'None'}}</div>
+                <div style="white-space: normal;">&nbsp;</div>
+                <div style="white-space: normal;">{{tipShowEvent.description}}</div>
+            </el-card>`,
+    data() {
+        return {
+            tipShowEvent: {}
+        }
+    }
+};
+function getTooltip(layer){
+    if(layer.options.index>=0&&layer.options.index<vm.gotEvents.length){
+        var tipCard = Vue.createApp(TipCardComponent);
+        for ([name, comp] of Object.entries(ElementPlusIconsVue)) {
+            tipCard.component(name, comp);
+        }
+        var instance = tipCard.use(ElementPlus).mount("#divTip");
+        instance.tipShowEvent = vm.gotEvents[layer.options.index];
+        return document.querySelector('#divTip .el-card'); // $# vm.$$refs.divTip.querySelector('.el-card');
+    }
+    return '';
+}
+</script>
+
+<script type="text/javascript">
+// Map
+var normalMap = L.tileLayer.chinaProvider('Google.Normal.Map', {
+        maxZoom: 18,
+        minZoom: 2,
+        attribution: '&copy; <a href="https://maps.google.com" target="_blank" rel="nofollow">GoogleMap</a>'
+    }),
+    satelliteMap = L.tileLayer.chinaProvider('Google.Satellite.Map', {
+        maxZoom: 18,
+        minZoom: 2,
+        attribution: '&copy; <a href="https://maps.google.com" target="_blank" rel="nofollow">GoogleMap</a>'
+    });
+var baseLayers = {
+    'Map': normalMap,
+    'Satellite': satelliteMap,
+}
+var vsmap;
+function initMap(mapid, findme) {
+    if (vsmap) return;
+    vsmap = L.map(mapid, {
+        center: [49.2218289,-122.9453852],
+        zoom: 12,
+        layers: [normalMap],
+        zoomControl: false
+    });
+
+    // Add controls: Fullscreen, Zoomin, Zoomout, Layers
+    vsmap.addControl(new L.Control.ZoomFS({position:'topright',zoomInTitle:'ZoomIn',zoomOutTitle:'ZoomOut'}));
+    var lcButton = L.control.locate({position:'topright',strings: {title:'Show me where I am, yo!'}}).addTo(vsmap);
+    var mapCtrlLayers = L.control.layers(baseLayers).addTo(vsmap);
+    vsmap.on('enterFullscreen', function() {
+        jQuery('#mapContainer').css('z-index','9999');
+    });
+    vsmap.on('exitFullscreen', function() {
+        jQuery('#mapContainer').css('z-index','');
+    });
+    // Map moved. Zoom will occur moveend, onZoomEnd -> onMoveEnd
+    vsmap.on('moveend', function(e){
+        if(vsmap.options.needQuery){
+            vm.queryEvents();
+        }
+        vsmap.options.needQuery = true;
+    });
+    vsmap.on('locationfound', function(e){
+        setTimeout(function(){lcButton.stopFollowing()}, 2000);
+    });
+    // Locate me
+    if (findme) {
+        lcButton.start();
+    }
+
+    return vsmap;
+}
+
+initMap('mapContainer', false);
+vm.queryEvents();
+</script>
+
+</html>
+

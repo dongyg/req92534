@@ -1,0 +1,10 @@
+version: '3'
+services:
+  vdocker:
+    image: docker:dind
+    privileged: true
+    container_name: vdocker
+    ports:
+      - 8027:80
+    volumes:
+      - ../:/vdisk

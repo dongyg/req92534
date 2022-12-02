@@ -1,0 +1,46 @@
+version: '3.1'
+services:
+  mongo:
+    image: mongo
+    container_name: r27_mongo
+    ports:
+      - 27017:27017
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 3Umx98K1FR6gCEPpNWeLcu
+    volumes:
+      - ../cfg/America_Vancouver:/etc/localtime:ro
+      - ../cfg/timezone:/etc/timezone:ro
+      - ../:/approot
+      - ../database:/data/db
+      # - /Users/vs/workDocker/data/mongo:/data/db
+  nginx:
+    image: nginx
+    container_name: r27_nginx
+    ports:
+      - 80:80
+    network_mode: bridge
+    restart: unless-stopped
+    volumes:
+      - ../cfg/America_Vancouver:/etc/localtime:ro
+      - ../cfg/timezone:/etc/timezone:ro
+      - ../:/approot
+      - ../cfg/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../logs/nginx:/data/logs/nginx
+      # - /Users/vs/workDocker/logs/nginx:/data/logs/nginx
+  r27:
+    # image: python:3.8-slim-buster
+    image: py3web
+    container_name: r27app
+    ports:
+      - 9080:9080
+      - 8080:8080
+    restart: unless-stopped
+    volumes:
+      - ../cfg/America_Vancouver:/etc/localtime:ro
+      - ../cfg/timezone:/etc/timezone:ro
+      - ../:/approot
+    # command: tail -f /etc/hosts
+    command: python server/main.wsgi 8080
+    # command: spawn-fcgi -f /approot/server/main.wsgi -p 9080 -u nobody -F 2 -n
